@@ -24,6 +24,7 @@ test <- read.csv("test.csv")
 #data clean
 nrow(train)
 
+
 datetxt <- as.Date(train$date)
 df <- data.frame(date = datetxt,
                  year = as.numeric(format(datetxt, format = "%Y")),
@@ -39,6 +40,7 @@ train$sunshine <- as.factor(train$sunshine)
 train$wind_gust_dir <- as.factor(train$wind_gust_dir)
 train$wind_dir9am <- as.factor(train$wind_dir9am)
 train$wind_dir3pm <- as.factor(train$wind_dir3pm)
+train$rain_today <- as.factor(train$rain_today)
 
 train$years <- as.factor(df$year)
 train$months <- as.factor(df$month)
@@ -46,7 +48,7 @@ train$days <- as.factor(df$day)
 
 train2 <- train
 
-install.packages("Hmisc")
+#install.packages("Hmisc")
 library(Hmisc)
 
 train2$evaporation <- with(train2,impute(evaporation,mode))
@@ -56,6 +58,9 @@ train2$wind_dir9am <- with(train2,impute(wind_dir9am,mode))
 train2$wind_dir3pm <- with(train2,impute(wind_dir3pm,mode))
 train2$wind_dir3pm <- with(train2,impute(wind_dir3pm,mode))
 train2$wind_dir3pm <- with(train2,impute(wind_dir3pm,mode))
+train2$rain_today <-  with(train2,impute(rain_today,mode))
+
+
 train2$rainfall <- with(train2,impute(rainfall,mean))
 train2$min_temp <- with(train2,impute(min_temp,mean))
 train2$max_temp <- with(train2,impute(max_temp,mean))
@@ -70,7 +75,6 @@ train2$cloud9am <- with(train2,impute(cloud9am,mean))
 train2$cloud3pm <- with(train2,impute(cloud3pm,mean))
 train2$temp9am <- with(train2,impute(temp9am,mean))
 train2$temp3pm <- with(train2,impute(temp3pm,mean))
-train2$rain_today <-  with(train2,impute(rain_today,mean))
 
 # pressure <- 1000.5
 # temp <-30.8
@@ -89,13 +93,14 @@ train3$density <- (train2$pressure3pm*100)/((train2$temp3pm+273.15)*rd)
 summary(train3)
 train3 <- train3[,-1]
 train3$rain_tomorrow <- as.factor(train3$rain_tomorrow)
+train3$rain_today <- as.factor(train3$rain_today)
 
 
 datetxt2 <- as.Date(test$date)
-df2 <- data.frame(date = datetxt,
-                 year2 = as.numeric(format(datetxt, format = "%Y")),
-                 month2 = as.numeric(format(datetxt, format = "%m")),
-                 day2 = as.numeric(format(datetxt, format = "%d")))
+df2 <- data.frame(date = datetxt2,
+                 year2 = as.numeric(format(datetxt2, format = "%Y")),
+                 month2 = as.numeric(format(datetxt2, format = "%m")),
+                 day2 = as.numeric(format(datetxt2, format = "%d")))
 
 
 year <- as.factor(df2$year2)
@@ -103,11 +108,10 @@ month <- as.factor(df2$month2)
 day <- as.factor(df2$day2)
 test2 <- test
 
-test2$density <- (test2$pressure3pm*100)/((test2$temp3pm+273.15)*rd)
 
-test2$year <- year
-test2$month <- month
-test2$day <- day
+test2$years <- year
+test2$months <- month
+test2$days <- day
 
 
 test2$location <- as.factor(test2$location)
@@ -142,14 +146,28 @@ test2$cloud9am <- with(test2,impute(cloud9am,mean))
 test2$cloud3pm <- with(test2,impute(cloud3pm,mean))
 test2$temp9am <- with(test2,impute(temp9am,mean))
 test2$temp3pm <- with(test2,impute(temp3pm,mean))
+
+
+test2$density <- (test2$pressure3pm*100)/((test2$temp3pm+273.15)*rd)
+
+
 summary(train3)
 train3
 summary(test2)
-a4 <- (predict(a,newdata=test2,type="response"))
+#a4 <- (predict(a,newdata=test2,type="response"))
 
 
 (6050+1159)/((808+531)+(6050+1159))
-a <- randomForest(rain_tomorrow ~ ., data=trains,importance=TRUE )
+
+#first attempt
+library(randomForest)
+a <- randomForest(rain_tomorrow ~ .-(date+evaporation+sunshine), data=train3,importance=TRUE )
+importance(a)
+a
+
+
+
+
 a2<- randomForest(rain_tomorrow ~ ., data=train3,importance=TRUE )
 summary(a2)
 a2$predicted
@@ -159,7 +177,23 @@ table(a5, tests$rain_tomorrow)
 predictions <- data.frame(id = test$id,rain_tomorrow = a5)
 predictions
 importance(a2)
-write.csv(predictions,"C:\\Users\\akhil\\Desktop\\predictions4.csv", row.names = FALSE)
+#write.csv(predictions,"C:\\Users\\akhil\\Desktop\\predictions4.csv", row.names = FALSE)
 
+summary(train3)
+test2
 ```
+
+```{r}
+a5 <- (predict(a,newdata=test2,type="response"))
+summary(train3)
+summary(test2)
+
+#table(a5, tests$rain_tomorrow)
+predictions <- data.frame(id = test$id,rain_tomorrow = a5)
+
+predictions
+summary(test2)
+write.csv(predictions, file = "Vosburghpredictions.csv", row.names = FALSE)
+```
+
 
