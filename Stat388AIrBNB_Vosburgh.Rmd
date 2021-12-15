@@ -1,0 +1,201 @@
+---
+title: "Stat388Project2_Vosburgh"
+author: "Stephen Vosburgh"
+date: "12/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Appendix
+
+## Import Data
+
+```{r}
+# Import Data
+train <- read.csv("train.csv")
+test <- read.csv("test.csv")
+summary(test)
+```
+
+
+## EDA
+
+```{r}
+set.seed(1234)
+summary(train)
+length(train$id)
+
+#room type
+unique(train$room_type)
+barplot(table(train$room_type), main="Room Type Distribution",
+   xlab="Number of Properties")
+train$room_type <- as.factor(train$room_type)
+test$room_type <- as.factor(test$room_type)
+sum(is.na(train['room_type']))
+#changed to factor
+
+#neighbourhood group
+unique(train$neighbourhood_group)
+barplot(table(train$neighbourhood_group), main="Neighborhood Group Distribution",
+   xlab="Number of Properties")
+train$neighbourhood_group <- as.factor(train$neighbourhood_group)
+test$neighbourhood_group <- as.factor(test$neighbourhood_group)
+sum(is.na(train['neighbourhood_group']))
+
+#neighbourhood
+unique(train$neighbourhood)
+sum(is.na(train['neighbourhood']))
+
+#latitude 
+boxplot(train$latitude, main = 'Latitude distribution')
+
+#longitude
+boxplot(train$longitude, main = 'Longitude distribution')
+
+#mininum nights
+boxplot(train$minimum_nights, main = 'Min nights distribution')
+
+#number of reviews
+boxplot(train$number_of_reviews, main = 'Number of Reviews distribution')
+
+#availability_365
+boxplot(train$availability_365, main = 'Availability distribution')
+
+#calculated host
+boxplot(train$availability_365, main = 'Availability distribution')
+
+
+#host_name
+unique(train$host_name)
+sum(is.na(train['host_name']))
+#14 NAs
+
+#host_id
+sum(is.na(train['host_id']))
+
+#id
+sum(is.na(train['id']))
+
+#name
+unique(train$name)
+sum(is.na(train['name']))
+#9 NAs
+
+#last review
+unique(train$last_review)
+sum(is.na(train['last_review']))
+#7008 NAs
+
+#reviews per month-only variable with NAs
+library(VIM)
+matrixplot(train)
+VIM::aggr(train)
+
+#impute missing NAs 
+library(mice)
+mids <- mice(train, method = 'cart')
+train_comp <- complete(mids, 1)
+train$reviews_per_month <- train_comp$reviews_per_month
+
+#impute missing NAs for test data set
+library(mice)
+mids <- mice(test, method = 'cart')
+test_comp <- complete(mids, 1)
+test$reviews_per_month <- test_comp$reviews_per_month
+```
+
+
+## Linear Model 
+
+```{r}
+#removed id, name, host_id, host_name, and last_review
+#too many unique values
+lin1 <- lm(price ~ neighbourhood_group + neighbourhood + latitude + longitude + room_type + minimum_nights + number_of_reviews + reviews_per_month + calculated_host_listings_count + availability_365, data=train)
+anova(lin1)
+```
+
+## Reduced linear model
+
+```{r}
+#remove insiginifocant variables from lin1, removed neighbourhood bc of error
+lin2 <- lm(price ~ neighbourhood_group  + longitude + room_type + minimum_nights + number_of_reviews + availability_365, data=train)
+anova(lin2)
+```
+
+### checking MSE
+
+```{r}
+linpred <- predict(lin2,newdata=train)
+lin_mse <- mean((linpred - train$price)^2)
+lin_mse
+
+
+```
+
+MSE is awful
+
+## LASSO 
+
+### finding lambda
+```{r}
+set.seed(1234)
+library(glmnet)
+trainmat <- model.matrix(price ~ as.factor(neighbourhood_group) + latitude + longitude + neighbourhood + as.factor(room_type) + minimum_nights + number_of_reviews + reviews_per_month + calculated_host_listings_count + availability_365, data = train)
+
+#testmat <- model.matrix(price ~ as.factor(neighbourhood_group) + latitude + longitude + as.factor(room_type) + minimum_nights + number_of_reviews + reviews_per_month + calculated_host_listings_count + availability_365, data = test2)
+
+cv = cv.glmnet(trainmat, train$price, alpha = 1)
+plot(cv)
+lammy <- cv$lambda.min
+lammy
+```
+
+### fitting model
+
+```{r}
+lasso <- glmnet(trainmat, train$price, alpha = 1,lambda = lammy)
+coef(lasso)
+```
+
+### checking MSE
+
+```{r}
+lasso_preddy <- predict(lasso, s=lammy, newx=testmat)
+lasso_mse <- mean((lasso_preddy - train$price)^2)
+lasso_mse
+```
+
+MSE still stinks
+
+# Random Forest
+
+```{r}
+library(randomForest)
+trees <- c(100,250,500)
+
+
+train
+#100 ttrees
+rf100 <- randomForest(price ~ neighbourhood_group + neighbourhood + longitude + room_type + minimum_nights + number_of_reviews + reviews_per_month + calculated_host_listings_count + availability_365, ntree= 100, data=train)
+rf100
+
+rf250 <- randomForest(price ~ neighbourhood_group + neighbourhood + longitude + room_type + minimum_nights + number_of_reviews + reviews_per_month + calculated_host_listings_count + availability_365, ntree= 250, data=train)
+rf250
+
+rf500 <- randomForest(price ~ neighbourhood_group + neighbourhood + longitude + room_type + minimum_nights + number_of_reviews + reviews_per_month + calculated_host_listings_count + availability_365, ntree= 500, data=train)
+rf500
+```
+
+## Writing csv file
+
+```{r}
+#rf250pred <- predict(rf250500,newdata= test) 
+#predictions <- data.frame(id = test$id,price = rf250pred)
+#write.csv(predictions, file = "rf250predictions.csv", row.names =FALSE)
+
+
+```
+
