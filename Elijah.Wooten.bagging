@@ -1,0 +1,137 @@
+---
+title: "STAT388_HW8"
+author: "Elijah Wooten"
+date: "12/3/2021"
+output: html_document
+---
+
+## Import Data
+
+```{r}
+# Import Data
+train <- read.csv("train.australia.csv")
+test <- read.csv("test.australia.csv")
+```
+
+```{r}
+set.seed(100)
+
+library(randomForest)
+library(Hmisc)
+
+# checking number of missing columns in training data set
+colSums(is.na(train))
+
+# creates numeric of year, month and day
+datetxt <- as.Date(train$date)
+df <- data.frame(date = datetxt,
+                 year = as.numeric(format(datetxt, format = "%Y")),
+                 month = as.numeric(format(datetxt, format = "%m")),
+                 day = as.numeric(format(datetxt, format = "%d")))
+
+
+# changes columns to factor variables
+train$location <- as.factor(train$location)
+train$evaporation <- as.factor(train$evaporation)
+train$sunshine <- as.factor(train$sunshine)
+train$wind_gust_dir <- as.factor(train$wind_gust_dir)
+train$wind_dir9am <- as.factor(train$wind_dir9am)
+train$wind_dir3pm <- as.factor(train$wind_dir3pm)
+
+train$years <- as.factor(df$year)
+train$months <- as.factor(df$month)
+train$days <- as.factor(df$day)
+train$rain_tomorrow <- as.factor(train$rain_tomorrow)
+
+# imputing data into missing values
+train$wind_gust_dir <- with(train,impute(wind_gust_dir,mode))
+train$wind_gust_dir <- with(train,impute(wind_gust_dir,mode))
+train$wind_dir9am <- with(train,impute(wind_dir9am,mode))
+train$wind_dir3pm <- with(train,impute(wind_dir3pm,mode))
+train$wind_dir3pm <- with(train,impute(wind_dir3pm,mode))
+train$wind_dir3pm <- with(train,impute(wind_dir3pm,mode))
+train$rainfall <- with(train,impute(rainfall,mean))
+train$min_temp <- with(train,impute(min_temp,mean))
+train$max_temp <- with(train,impute(max_temp,mean))
+train$wind_gust_speed <- with(train,impute(wind_gust_speed,mean))
+train$wind_speed9am <- with(train,impute(wind_speed9am,mean))
+train$wind_speed3pm <- with(train,impute(wind_speed3pm,mean))
+train$humidity9am <- with(train,impute(humidity9am,mean))
+train$humidity3pm <- with(train,impute(humidity3pm,mean))
+train$pressure9am <- with(train,impute(pressure9am,mean))
+train$pressure3pm <- with(train,impute(pressure3pm,mean))
+train$temp9am <- with(train,impute(temp9am,mean))
+train$temp3pm <- with(train,impute(temp3pm,mean))
+train$rain_today <-  with(train,impute(rain_today,mean))
+
+#creates copy of training data without variables with several missing rows
+train2 <- subset(train, select = -c(date, id, evaporation, sunshine, cloud9am, cloud3pm))
+
+datetxt <- as.Date(test$date)
+df <- data.frame(date = datetxt,
+                 year = as.numeric(format(datetxt, format = "%Y")),
+                 month = as.numeric(format(datetxt, format = "%m")),
+                 day = as.numeric(format(datetxt, format = "%d")))
+
+# changes test columns to factor variables
+test$location <- as.factor(test$location)
+test$evaporation <- as.factor(test$evaporation)
+test$sunshine <- as.factor(test$sunshine)
+test$wind_gust_dir <- as.factor(test$wind_gust_dir)
+test$wind_dir9am <- as.factor(test$wind_dir9am)
+test$wind_dir3pm <- as.factor(test$wind_dir3pm)
+test$years <- as.factor(df$year)
+test$months <- as.factor(df$month)
+test$days <- as.factor(df$day)
+
+# imputing data into missing test values
+test$wind_gust_dir <- with(test,impute(wind_gust_dir,mode))
+test$wind_dir9am <- with(test,impute(wind_dir9am,mode))
+test$wind_dir3pm <- with(test,impute(wind_dir3pm,mode))
+test$wind_dir3pm <- with(test,impute(wind_dir3pm,mode))
+test$wind_dir3pm <- with(test,impute(wind_dir3pm,mode))
+test$rainfall <- with(test,impute(rainfall,mean))
+test$min_temp <- with(test,impute(min_temp,mean))
+test$max_temp <- with(test,impute(max_temp,mean))
+test$wind_gust_speed <- with(test,impute(wind_gust_speed,mean))
+test$wind_speed9am <- with(test,impute(wind_speed9am,mean))
+test$wind_speed3pm <- with(test,impute(wind_speed3pm,mean))
+test$humidity9am <- with(test,impute(humidity9am,mean))
+test$humidity3pm <- with(test,impute(humidity3pm,mean))
+test$pressure9am <- with(test,impute(pressure9am,mean))
+test$pressure3pm <- with(test,impute(pressure3pm,mean))
+test$temp9am <- with(test,impute(temp9am,mean))
+test$temp3pm <- with(test,impute(temp3pm,mean))
+test$rain_today <-  with(test,impute(rain_today,mean))
+
+#creates copy of test data set without variables with several missing values
+test2 <- subset(test, select = -c(date, id, evaporation, sunshine, cloud9am, cloud3pm))
+
+set.seed(100)
+
+#trying bagging
+library(caret)
+library(rpart)
+library(ipred)
+
+#creates bagging model on training data
+rain.bag <- bagging(rain_tomorrow ~ ., data = train2, nbagg = 100)
+
+bag.VI <- data.frame(var = names(train2[,-4]), imp = varImp(rain.bag))
+
+bag.VI.plot <- bag.VI[order(bag.VI$Overall, decreasing = TRUE),]
+
+barplot(bag.VI.plot[1:5,]$Overall,
+        names.arg=rownames(bag.VI.plot[1:5,]),
+        horiz=TRUE,
+        col='navy',
+        xlab='Variable Importance')
+
+#predicts rain tomorrow using bagging model
+rain.bag.pred <- predict(rain.bag, test2, type = "prob")
+
+#creates data frame of test ids and rain predictions
+rain.bag.predictions <- data.frame(id = test$id, rain_tomorrow = rain.bag.pred[,2])
+
+#writes rain predictions to csv
+#write.csv(rain.bag.predictions, file = "Rain.bag.predictions.csv", row.names = FALSE)
